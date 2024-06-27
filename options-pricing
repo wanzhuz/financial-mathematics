@@ -1,0 +1,217 @@
+reset;
+
+print "1. Compute intrinsic value process";
+# Number of periods
+param N = 3;
+# Stock price time 0
+param S0 = 10;
+# Stock price increases 17% or decreases by 14.5%.
+param u = 0.17;         # up factor
+param d = 1/1.17 - 1;   # down factor
+# d = -0.145299
+
+# Risk free asset
+param r = 0.076;
+param A0 = 20;
+set TIMES ordered = 0..N;
+
+# set of all possible prices
+set PRICES { t in TIMES }
+   = if t = 0
+     then {S0}
+     else setof {price in PRICES[t-1]} round((1+u)*price,3)
+	    union
+	      setof {price in PRICES[t-1]} round((1+d)*price,3);
+display PRICES;
+
+param STRIKE = 10.751;  # strike price
+param G {t in TIMES, price in PRICES[t]}
+  := max(STRIKE - price, 0);
+for { t in {0,1,2,N} } { 
+display { price in PRICES[t] }
+  G[t, price];  
+}
+
+print "2. Compute stop times, cash flow, and fair price of American put";
+param p_star = (r - d) / (u - d);
+param prec = 3;
+
+set ROUNDED_PRICES { t in TIMES }
+  = setof {price in PRICES[t]} round(price, prec);
+# display ROUNDED_PRICES[N];
+
+# stop time
+param Stop {t in TIMES, price in ROUNDED_PRICES[t]}
+  := if (t = 1 and price = round(S0 * (1 + u), prec) and G[t, price] > 0)
+     then t
+     else if (t = 2 and (price = round(S0 * (1 + d) * (1 + u), prec)) and G[t, price] > 0)
+          then t
+          else if (t = 3 and G[t, price] > 0)
+               then t
+               else N+1;
+for {t in {0, 1, 2, N}} {
+  display {price in ROUNDED_PRICES[t]}
+    Stop[t, price];
+}
+for {t in TIMES} {
+  for {price in ROUNDED_PRICES[t]} {
+    if Stop[t, price] = t then {
+      printf "Stop at time %d if price=%g\n",
+                t, price;
+    }
+  }
+}
+
+# cash flow process
+param CF { t in TIMES, price in ROUNDED_PRICES[t] }
+  := if Stop[t, price] = t then G[t, price] else 0;
+display CF;
+
+# calculate the present value
+param PV { t in TIMES, price in ROUNDED_PRICES[t] }
+  := CF[t, price] / (1 + r)^t;
+display PV;
+
+# fair price
+param FairPrice := sum {t in TIMES, price in ROUNDED_PRICES[t]} PV[t, price];
+print "The fair price of the American put optin is", FairPrice;
+
+print "3. Compute cash flow, present value, and fair price of European put";
+# cash flow
+param CF_EU { t in TIMES, price in ROUNDED_PRICES[t] }
+  := if t = N then G[t, price] else 0;
+display CF_EU;
+
+# present value of cash flow
+param PV_EU { t in TIMES, price in ROUNDED_PRICES[t] }
+  := CF_EU[t, price] / (1 + r)^t;
+display PV_EU;
+
+# fair price
+param FairPrice_EU := sum {price in ROUNDED_PRICES[N]} PV_EU[N, price];
+print "The fair price of the European put option is", FairPrice_EU;
+
+print "4. Find non-discounted price process, optimal stops, and cash flow";
+# non-discounted price process
+param C_opt {t in TIMES, price in ROUNDED_PRICES[t]};
+set BACKWARD_TIMES ordered by reversed TIMES := TIMES;
+for {t in BACKWARD_TIMES} {
+  for {price in PRICES[t]} {
+    let C_opt[t, round(price, prec)]
+      := if t = N   # base case
+           then G[t, price]  
+           else max((p_star * C_opt[t+1, round(price*(1+u), prec)]
+                         + (1-p_star) * C_opt[t+1, round(price*(1+d), prec)]),
+                    G[t, price]);
+  }
+}
+for {t in {0, 1, N-1, N}} {
+  display {price in ROUNDED_PRICES[t]}
+    C_opt[t, price];
+}
+
+# Optimal stop times
+param OptStop {t in TIMES, price in ROUNDED_PRICES[t]}
+  := 
+  if C_opt[t, price] = STRIKE - price
+  then t
+  else N+1;
+
+for {t in {0, 1, 2, N}} {
+  display {price in ROUNDED_PRICES[t]}
+    OptStop[t, price];
+}
+for {t in TIMES} {
+  for {price in ROUNDED_PRICES[t]} {  
+    if OptStop[t, price] = t then {
+      printf "Stop at time %d if price=%g\n",
+                t, price;
+    }
+  }
+}
+# cash flow
+param CF_OPT { t in TIMES, price in ROUNDED_PRICES[t] }
+  := if OptStop[t, price] = t then G[t, price] else 0;
+display CF_OPT;
+
+print "1. Plot and determine the expressions for D1 as a fxn of S1";
+print "var D1 :=";
+    print "if 0 <= S1 < 30 then 0";
+    print "else if 30 <= S1 <= 46 then (57/16) * (S1 - 30)";
+    print "else if 46 < S1 < 80 then 57 - (57/34) * (S1 - 46)";
+    print "else 0";
+
+print "2. Can we replicate with only stocks and risk-free assets?";
+print "No, because a portfolio containing S(1) and A(1) can only produce";
+print "payoffs that are linear functions of the stock S(1). Since the payoff";
+print "function is is piecewise with 2 segments containing 2 different slopes";
+print "and continuities, we can't replicate with a linear combination of S and A";
+
+print "3. Can we replicate with finite call options?";
+param X1 = 30;    # strike prices
+param X2 = 46;
+param Q1 = 57/16; # quantities for the call options
+param Q2 = 57/34;
+
+# stock prices to evaluate
+set STOCK_PRICES := {15, 40, 46, 70, 80, 90};
+# payoffs
+param C1{STOCK_PRICES};
+param C2{STOCK_PRICES};
+param D{STOCK_PRICES};
+
+param payC1{S in STOCK_PRICES} := max(0, S - X1);
+param payC2{S in STOCK_PRICES} := max(0, S - X2);
+		let {S in STOCK_PRICES} C1[S] := payC1[S];
+		let {S in STOCK_PRICES} C2[S] := payC2[S];
+
+# portfolio payoff
+let {S in STOCK_PRICES} D[S] :=
+    if S < 30 then 0
+    else if S <= 46 then Q1 * C1[S]
+    else if S < 80 then Q1 * C1[46] - Q2 * C2[S]  # use short call
+    else 0;
+display D;
+
+print "4. Replicate with at least one put, one call, but not S";
+param Qc = 57/16; # quantity for the call option
+param Qp = 57/34; # quantity for the put option
+param A = 77;     # risk-free asset
+
+# payoffs
+param C{STOCK_PRICES};  # call option payoffs
+param P{STOCK_PRICES};  # put option payoffs
+param D1{STOCK_PRICES};  # portfolio payoffs
+
+param payC{S in STOCK_PRICES} := max(0, S - X1);
+param payP{S in STOCK_PRICES} := X2 - S;
+		let {S in STOCK_PRICES} C[S] := payC[S];
+		let {S in STOCK_PRICES} P[S] := payP[S];
+
+# portfolio payoff
+let {S in STOCK_PRICES} D1[S] :=
+    if S < 30 then 0
+    else if S <= 46 then Qc * C[S]
+    else if S < 80 then Qc * C[46] + Qp * P[S]
+    else 0;
+display D1;
+
+print "5. Replicate when S(1):  S^u(1) = 62 and S^d(1) = 33";
+param A1 = 77;
+param S1u = 62;  # stock go up
+param S1d = 33;  # stock go down
+# payoffs
+param D1u = 57 - Q2 * (S1u - X2);  
+param D1d = Q1 * (S1d - X1);
+
+var Delta;  # units of stock
+var B;      # units of risk-free asset
+
+# solve system of linear equations
+s.t. Pay1: Delta * S1u + B * A1 = D1u;
+s.t. Pay2: Delta * S1d + B * A1 = D1d;
+minimize TotalInvestment: Delta + B;
+
+option solver highs;
+solve;
+display Delta, B;
