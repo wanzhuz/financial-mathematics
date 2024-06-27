@@ -1,0 +1,225 @@
+reset;
+
+print "1. Compute the stock price process, the sum-so-far process, and p*";
+# Number of periods
+param N = 3;
+
+## Variant: Stock price increases 15% or decreases by 8%.
+param u = 0.17;         # up factor
+param d = 1/1.17 - 1;   # down factor
+# d = -0.145299
+
+# Risk free asset
+param r = 0.076;
+param A0 = 20;
+set TIMES = 0..N;
+
+# Stock price time 0
+param S0 = 10;
+
+# collect all possible prices at time t
+set PRICES { t in TIMES }
+   := if t = 0
+     then {S0}
+     else setof {price in PRICES[t-1]} round((1+u)*price,3)
+	    union
+	      setof {price in PRICES[t-1]} round((1+d)*price,3);
+display PRICES;
+
+# sum-so-far process
+param Y {t in TIMES, p in PRICES[t]} 
+	:= if t = 0 
+	then p 
+	else p + sum {price in PRICES[t-1]} 
+	if round((1+u)*price, 3) = p or round((1+d)*price, 3) = p 
+	then Y[t-1, price];
+
+display Y;
+
+# risk-neutral probability
+param p_star = (r - d) / (u - d);
+display p_star;
+
+print "2. Determine the payoff D(3)";
+check d < r < u;
+param X = 9.75;  # strike price for Euro option
+
+# European payoffs at t=3
+# max(mean(S(0), ..., S(3)) - strike price, 0)
+param D3 {p in PRICES[3]} :=
+    max(Y[3, p]/4 - X, 0);
+display D3;
+
+print "3. Determine the payoff D(2)";
+# European payoffs at t=2
+param D2 {p in PRICES[2]} :=
+    max(Y[2, p]/3 - X, 0);
+display D2;
+
+print "4. Determine the payoff D(1)";
+# European payoffs at t=1
+param D1 {p in PRICES[1]} :=
+    max(Y[1, p]/2 - X, 0);
+display D1;
+
+print "5. Determine the payoff D(0)";
+# European payoffs at t=1
+param D0 {p in PRICES[0]} :=
+    max(Y[0, p] - X, 0);
+display D0;
+
+param STRIKE = 10.75;  # strike price
+
+print "1. Compute the non-discounted stock price process"; 
+# use path independence
+param S {t in TIMES, nu in TIMES: nu <= t }
+  := if t = 0
+     then S0  
+     else if nu > 0
+          then (1+u) * S[t-1, nu-1]
+          else (1+d) * S[t-1, 0];
+display S;
+
+print "2. Compute the intrinsic value process";
+param G {t in TIMES, nu in TIMES: nu <= t} := 
+	max(S[t,nu] - STRIKE, 0);
+display G;
+
+print "3. Determine and price the cash flow";
+# Define the stopping times
+# 1 = exercise, 0 = do not exercise
+param AmericanStop {t in TIMES, nu in TIMES: nu <= t} := 
+    if (t = 1 and nu = 1) then 1
+    else if (t = 2 and nu = 1) then 1
+    else if (t = 3 and nu = 1) then 1
+    else 0;
+
+param CashFlow {t in TIMES, nu in TIMES: nu <= t} := 
+  # American call with respect to a stopping time
+  #
+  if AmericanStop[t, nu] = 1
+  then max(S[t,nu] - STRIKE, 0)   # intrinsic value
+  else 0;
+  
+ display CashFlow; 
+
+print "4. Find optimal stop time, non-discounted price process, and cash flow";
+# non-discounted stock price process recursive
+param C_opt { t in TIMES, nu in TIMES: nu <= t }
+  := if t = N
+     then max(S[t,nu] - STRIKE, 0)  # intrinsic value
+
+     else max((p_star * C_opt[t+1, nu+1]
+                         + (1-p_star) * C_opt[t+1, nu]),
+              S[t,nu] - STRIKE);
+              
+display C_opt;
+
+# optimal stopping time
+param OptimalStopTime {t in TIMES, nu in TIMES: nu <= t}
+  := 
+  if C_opt[t, nu] = S[t,nu] - STRIKE
+  then t
+  else N+1;
+
+display OptimalStopTime;
+
+# optimal cash flow  
+param OptimalCashFlow {t in TIMES, nu in TIMES: nu <= t} := 
+  # American call with respect to a stopping time
+  #
+  if OptimalStopTime[t, nu] = t
+  then max(S[t,nu] - STRIKE, 0)   # intrinsic value
+  else 0;
+  
+ display OptimalCashFlow; 
+  
+print "Problem C";
+print "1. Determine the covariance matrix";
+param sigma{1..3};  # standard deviations
+param rho{1..3, 1..3};  # correlation coefficients
+
+# Standard deviations
+let sigma[1] := 0.027;
+let sigma[2] := 0.02;
+let sigma[3] := 0.056;
+
+# Correlation coefficients
+let rho[1, 1] := 1;
+let rho[1, 2] := 0.87;
+let rho[1, 3] := -0.27;
+let rho[2, 1] := 0.87;
+let rho[2, 2] := 1;
+let rho[2, 3] := 0.17;
+let rho[3, 1] := -0.27;
+let rho[3, 2] := 0.17;
+let rho[3, 3] := 1;
+
+# Covariance matrix
+param cov{1..3, 1..3};
+let {i in 1..3, j in 1..3} cov[i,j] := rho[i,j] * sigma[i] * sigma[j];
+
+display cov;
+
+print "2. Tabulate and plot sigma-mu for S1, S2, S3 investment";
+param mu{1..3};
+
+# Expected returns
+let mu[1] := 0.046;
+let mu[2] := 0.057;
+let mu[3] := 0.06;
+
+# Weights
+param w1{1..21};
+let w1[1] := -0.5;
+let w1[2] := -0.4;
+let w1[3] := -0.3;
+let w1[4] := -0.2;
+let w1[5] := -0.1;
+let w1[6] := 0;
+let w1[7] := 0.1;
+let w1[8] := 0.2;
+let w1[9] := 0.3;
+let w1[10] := 0.4;
+let w1[11] := 0.5;
+let w1[12] := 0.6;
+let w1[13] := 0.7;
+let w1[14] := 0.8;
+let w1[15] := 0.9;
+let w1[16] := 1;
+let w1[17] := 1.1;
+let w1[18] := 1.2;
+let w1[19] := 1.3;
+let w1[20] := 1.4;
+let w1[21] := 1.5;
+
+# Calculating corresponding w2
+param w2{1..21};
+let {i in 1..21} w2[i] := 1 - w1[i];
+
+# Portfolio return and standard deviation
+param mu_p{1..21};
+param sigma_p{1..21};
+
+let {i in 1..21} mu_p[i] := w1[i] * mu[1] + w2[i] * mu[2];
+let {i in 1..21} sigma_p[i] := sqrt(w1[i]^2 * 
+									sigma[1]^2 + w2[i]^2 * sigma[2]^2 
+									+ 2 * w1[i] * w2[i] * cov[1,2]);
+
+display w1, w2, sigma_p, mu_p;
+
+print"3. Tabulate and plot sigma-mu for only S1, S3 investment";
+# Calculating corresponding w3
+param w3{1..21};
+let {i in 1..21} w3[i] := 1 - w1[i];
+
+# Portfolio return and standard deviation
+param mu_p_{1..21};
+param sigma_p_{1..21};
+
+let {i in 1..21} mu_p_[i] := w1[i] * mu[1] + w3[i] * mu[3];
+let {i in 1..21} sigma_p_[i] := sqrt(w1[i]^2 * 
+									sigma[1]^2 + w3[i]^2 * sigma[3]^2 
+									+ 2 * w1[i] * w3[i] * cov[1,3]);
+
+display w1, w3, sigma_p_, mu_p_;
