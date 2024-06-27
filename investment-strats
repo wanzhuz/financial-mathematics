@@ -1,0 +1,332 @@
+reset;
+param N = 3; # number of periods
+
+# variant: Stock price increases 10.1% or increases by 2.7%.
+param u = 0.101;         # up factor
+param d = 0.027;         # down factor
+
+# risk free asset
+param r = 0.056;		 # interest rate
+param A0 = 20;			 # value of risk free asset at time 0
+
+set TIMES = 0..N;
+
+param A{t in TIMES} := 
+    # A0 * (1+r)^t;    
+    if t = 0 then 20
+    else (1+r) * A[t - 1];
+
+# display A;
+# A [*] :=
+# 0  20
+# 1  21.12
+# 2  22.3027
+# 3  23.5517
+# ;
+
+print "1. Compute stock price process";
+# Stock price time 0
+param S0 = 10;
+display S0;
+# Stock price time 1
+param            S1u = S0 * (1+u);
+param            S1d = S0 * (1+d);
+display S1u, S1d;
+# Stock price time 2
+param                              S2uu = S1u * (1+u);
+param                              S2ud = S1u * (1+d);
+param                              S2du = S1d * (1+u);
+param                              S2dd = S1d * (1+d);
+display S2uu, S2ud, S2du, S2dd;
+# S2uu = 12.122
+# S2ud = 11.3073
+# S2du = 11.3073
+# S2dd = 5473
+
+# verify path-independence
+check S2ud = S2du;
+
+# use path independence now:
+param                                                  S3_3u = S2uu * (1+u);
+param                                                  S3_2u = S2ud * (1+u);
+check                                                  S3_2u = S2uu * (1+d);
+param                                                  S3_1u = S2ud * (1+d);
+param                                                  S3_0u = S2dd * (1+d);
+display S3_3u, S3_2u, S3_1u, S3_0u;
+# S3_3u = 13.3463
+# S3_2u = 12.4493
+# S3_1u = 11.6126
+# S3_0u = 10.8321
+
+# nu = number of "u"s
+param S {t in TIMES, nu in TIMES: nu <= t }
+  := if t = 0
+     then S0
+     else if nu > 0
+          then (1+u) * S[t-1, nu-1]
+          else (1+d) * S[t-1, 0];
+
+check S[3,2] = S3_2u;
+
+print "2. Compute discounted stock price process";
+param D = 1 / (1 + r);  # discount factor
+# Discounted stock prices at time 0
+param tilda_S0 = S0;  # raised to the power of 0
+param 			 tilda_S1u = D * S1u;
+param 			 tilda_S1d = D * S1d;
+param 			 				tilda_S2uu = D^2 * S2uu;
+param 							tilda_S2ud = D^2 * S2ud;
+param 							tilda_S2dd = D^2 * S2dd;
+param 											  tilda_S3_3u = D^3 * S3_3u;
+param 											  tilda_S3_2u = D^3 * S3_2u;
+param 											  tilda_S3_1u = D^3 * S3_1u;
+param 											  tilda_S3_0u = D^3 * S3_0u;
+display tilda_S0; 
+display tilda_S1u, tilda_S1d;
+display tilda_S2uu, tilda_S2ud, tilda_S2dd;
+display tilda_S3_3u, tilda_S3_2u, tilda_S3_1u, tilda_S3_0u;
+
+print "3. Compute conditional expectations";
+param p = 0.97;  # probability of an "up"
+# Conditional expectations for E2
+param E2_tilda_S3uu = p * tilda_S3_3u + (1-p) * tilda_S3_2u;
+param E2_tilda_S3ud = p * tilda_S3_2u + (1-p) * tilda_S3_1u;
+param E2_tilda_S3dd = p * tilda_S3_1u + (1-p) * tilda_S3_0u;
+display E2_tilda_S3uu, E2_tilda_S3ud, E2_tilda_S3dd;
+
+# Conditional expectations for E1
+param E1_tilda_S3u = p * E2_tilda_S3uu + (1-p) * E2_tilda_S3ud;
+param E1_tilda_S3d = p * E2_tilda_S3ud + (1-p) * E2_tilda_S3dd;
+display E1_tilda_S3u, E1_tilda_S3d;
+
+print "4. Compute risk neutral probabiliy and conditional expectations";
+# risk-neutral probability
+param p_star = (r - d) / (u - d);
+display p_star;
+# p_star = 0.391892
+
+# risk-neutral conditional expectations for E2
+param E2_star_tilda_S3uu = p_star * tilda_S3_3u + (1 - p_star) * tilda_S3_2u;
+param E2_star_tilda_S3ud = p_star * tilda_S3_2u + (1 - p_star) * tilda_S3_1u;
+param E2_star_tilda_S3dd = p_star * tilda_S3_1u + (1 - p_star) * tilda_S3_0u;
+display E2_star_tilda_S3uu, E2_star_tilda_S3ud, E2_star_tilda_S3dd;
+
+# risk-neutral conditional expectations for E1
+param E1_star_tilda_S3u = p_star * E2_star_tilda_S3uu + (1 - p_star) * E2_star_tilda_S3ud;
+param E1_star_tilda_S3d = p_star * E2_star_tilda_S3ud + (1 - p_star) * E2_star_tilda_S3dd;
+display E1_star_tilda_S3u, E1_star_tilda_S3d;
+
+print "5. Determine sigma algebra and compute conditional expectations";
+param p_ = 0.6;  # probability of an "up" 
+
+set Omega = {'uuu', 'uud', 'udu', 'udd', 
+             'duu', 'dud', 'ddu', 'ddd'};
+param p2_uu := p_^2;
+param p2_ud := p_ * (1-p_);
+param p2_du := (1-p_) * p_;
+param p2_dd := (1-p_) * (1-p_);
+display p2_uu, p2_ud, p2_dd;
+# p2_uu = 0.36
+# p2_ud = 0.24
+# p2_dd = 0.16
+
+# calcluate conditional expectation given F1
+param E_tilda_S3_F1_u =
+    p2_uu * tilda_S3_3u +
+    p2_ud * tilda_S3_2u +
+    p2_du * tilda_S3_2u +
+    p2_dd * tilda_S3_1u;
+display E_tilda_S3_F1_u;
+
+param E_tilda_S3_F1_d =
+    p2_uu * tilda_S3_2u +
+    p2_ud * tilda_S3_1u +
+    p2_du * tilda_S3_1u +
+    p2_dd * tilda_S3_0u;
+display E_tilda_S3_F1_d;
+
+param p3_uuu = p_^3;
+param p3_uud = p_^2 * (1-p_);
+param p3_udu = p_^2 * (1-p_);
+param p3_udd = p_^1 * (1-p_)^2;
+param p3_duu = p_^2 * (1-p_);
+param p3_dud = p_^1 * (1-p_)^2;
+param p3_ddu = p_^1 * (1-p_)^2;
+param p3_ddd = (1-p_)^3;
+display  p3_uuu, p3_uud, p3_udu; 
+# p3_uuu = 0.216
+# p3_uud = 0.144
+# p3_udu = 0.144     
+
+check d < r < u;
+param X = 12.75;  # strike price
+
+print "1. Determine payoff of option at expiration date";
+
+# price at time 3 = Payoff at time 3.
+# European call is path-independent:
+param                             D3_3u = max(S3_3u - X, 0);
+param                             D3_2u = max(S3_2u - X, 0);
+param                             D3_1u = max(S3_1u - X, 0);
+param                             D3_0u = max(S3_0u - X, 0);
+
+param D3 { nu in 0..3 } := 
+  max(S[3,nu] - X, 0);
+  
+check D3_2u = D3[2];
+display D3;
+# D3 [*] :=
+# 0  0
+# 1  0
+# 2  0
+# 3  0.596333
+# ;
+
+print "2. Compute the non-discounted price process of the option";
+
+# option prices at time 2
+param D2uu = p_star * D3[3] + (1 - p_star) * D3[2];
+param D2ud = p_star * D3[2] + (1 - p_star) * D3[1];
+param D2dd = p_star * D3[1] + (1 - p_star) * D3[0];
+display D2uu, D2ud, D2dd;
+# D2uu = 0.233698
+# D2ud = 0
+# D2dd = 0
+
+# option prices at time 1
+param D1u = p_star * D2uu + (1 - p_star) * D2ud;
+param D1d = p_star * D2ud + (1 - p_star) * D2dd;
+display D1u, D1d;
+# D1u = 0.0915844
+# D1d = 0
+
+# option price at time 0
+param D0 = p_star * D1u + (1 - p_star) * D1d;
+display D0;
+# D0 = 0.0358912
+
+# replication:
+var s0;  # number of shares of stock bought at time 0
+         # ">= 0" - "long position in stock",
+         # "<= 0" - "short position in stock". 
+              
+var a0;  # number of units of risk-free asset at time 0
+         # (if positive)
+         # or credit line used (if negative)
+
+# Rebalanced portfolio in the "u" and "d" scenarios.
+var s1u; # number of shares of stock 
+         # held after time 1
+var s1d;
+         
+var a1u; # number of units of risk-free asset 
+         # held after time 1
+var a1d;
+
+# To each "state" (of stock price) at time 1,
+# there is a unique path that leads to it.
+
+# Rebalanced portfolio, path-independent
+var s2_2u;
+var s2_1u;  # used both for ud and du.
+var s2_0u;
+
+var a2_2u;
+var a2_1u;  # used both for ud and du.
+var a2_0u;
+
+set TIMES_EXCEPT_END = 0..N-1;
+
+var s {t in TIMES_EXCEPT_END, nu in TIMES_EXCEPT_END: nu <= t };
+var a {t in TIMES_EXCEPT_END, nu in TIMES_EXCEPT_END: nu <= t };
+
+
+# Wealth at time 0 of replicating portfolio
+# = price of the call option:
+var W0;
+
+# Wealth at time 1 of replicating portfolio 
+# (a random variable)
+# = price of the call option at time 1:
+var W1u;
+var W1d;
+
+# Wealth at time 2 of replicating portfolio (path-independent)
+var W2_2u;
+var W2_1u;  # used both for ud and du
+var W2_0u;
+
+
+var W { t in TIMES, nu in TIMES: nu <= t };
+
+
+maximize dummy: 0;
+
+# wealth equations:
+
+# at time 0, looking forward (# equations = # nodes = 1):
+subject to W_repl_wealth0forward: W[0,0] = s[0,0] * S[0,0] + a[0,0] * A[0];
+
+# at time 1, looking backward (# equations = # edges entering nodes = 2):
+subject to W_repl_wealth1uback: W[1,1] = s[0,0] * S[1,1] + a[0,0] * A[1];
+subject to W_repl_wealth1dback: W[1,0] = s[0,0] * S[1,0] + a[0,0] * A[1];
+
+# REBALANCE! (from s0, a0 to s1, a1)
+# at time 1, looking forward (# equations = # nodes = 2):
+subject to W_repl_wealth1uforward: W[1,1] = s[1,1] * S[1,1] + a[1,1] * A[1];
+subject to W_repl_wealth1dforward: W[1,0] = s[1,0] * S[1,0] + a[1,0] * A[1];
+
+# at time 2, looking backward (# equations 
+#                              = # edges entering nodes
+#                                  in binomial lattice
+#                              = 1 + 2 + 1 = 4)
+subject to W_repl_w2uuback: W[2,2] = s[1,1] * S[2,2] + a[1,1] * A[2]; # uu
+subject to W_repl_w2udback: W[2,1] = s[1,1] * S[2,1] + a[1,1] * A[2]; # ud
+subject to W_repl_w2duback: W[2,1] = s[1,0] * S[2,1] + a[1,0] * A[2]; # du
+subject to W_repl_w2ddback: W[2,0] = s[1,0] * S[2,0] + a[1,0] * A[2]; # dd
+
+subject to W_repl_w2_up {nu in 0..1}:
+   W[2,nu+1] = s[1,nu] * S[2,nu+1] + a[1,nu] * A[2];
+subject to C_repl_w2_down {nu in 0..1}:
+   W[2,nu]   = s[1,nu] * S[2,nu]   + a[1,nu] * A[2];
+
+# at time 2, looking forward (# equations = # nodes = 3)
+subject to W_repl_w2_forward{nu in 0..2}:
+  W[2,nu] = s[2,nu] * S[2,nu] + a[2,nu] * A[2];
+
+
+# at time 3, looking backward (# equations
+subject to W_repl_w3_up {nu in 0..2}:
+  W[3,nu+1] = s[2,nu] * S[3,nu+1] + a[2,nu] * A[3];
+
+subject to W_repl_w3_down {nu in 0..2}:
+  W[3,nu]   = s[2,nu] * S[3,nu]   + a[2,nu] * A[3];
+
+# force prices at time 3 to be equal to the given payoffs.
+
+subject to W3_param_values{nu in TIMES}: W[3,nu] = D3[nu];
+
+solve;
+# replicated!
+display s, a;
+# :        s           a         :=
+# 0 0   0.110984   -0.0539683
+# 1 0   0           0
+# 1 1   0.271627   -0.137712
+# 2 0   0           0
+# 2 1   0           0
+# 2 2   0.664787   -0.351403
+
+display W;
+# W :=
+# 0 0   0.0304787
+# 1 0   0
+# 1 1   0.0821284
+# 2 0   0
+# 2 1   0
+# 2 2   0.221305
+# 3 0   0
+# 3 1   0
+# 3 2   0
+# 3 3   0.596333
+# ;
