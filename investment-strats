@@ -330,3 +330,7 @@ display W;
 # 3 2   0
 # 3 3   0.596333
 # ;
+
+print "3. Is it possible to replicate using static investment strategy?";
+print "No, we cannot replicate the option using a static investment strategy";
+print "if we are given the same amount of cash in the beginning";
