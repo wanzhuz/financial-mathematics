@@ -49,11 +49,11 @@ Your personal derivative security D has the following continuous piecewise linea
 
 If 0 <= S(1) <= 30, then D(1) = 0.
 
-On the interval 30 <= S(1) <= 4X, the payoff D(1) increases linearly until for S(1) = 4X it reaches the value 5Y.
+On the interval 30 <= S(1) <= 46, the payoff D(1) increases linearly until for S(1) = 46 it reaches the value 5Y.
 
-On the interval 4X <= S(1) <= 8Z, the payoff D(1) decreases linearly until for S(1) = 8Z it becomes 0.
+On the interval 46 <= S(1) <= 80, the payoff D(1) decreases linearly until for S(1) = 80 it becomes 0.
 
-For S(1) >= 8Z, D(1) remains 0.
+For S(1) >= 80, D(1) remains 0.
 
 1. Plot this function and determine expressions for D(1) as a function of S(1) on each of the two middle pieces.
 
@@ -72,11 +72,11 @@ Consider the 3-period binomial model with a risk-free asset A with A(0) = 20, in
 
 2. Compute the discounted stock price process S̃(0), S̃(1), S̃(2), S̃(3). 
 
-3. Investor A estimates that the probability of "up" equals p = 0.9Y. Compute 𝔼2[S̃(3)], that is, the conditional expectation of S̃(3) given the information about the first two coin tosses as a random variable. Then compute 𝔼1[S̃(3)].
+3. Investor A estimates that the probability of "up" equals p = 0.97. Compute 𝔼2[S̃(3)], that is, the conditional expectation of S̃(3) given the information about the first two coin tosses as a random variable. Then compute 𝔼1[S̃(3)].
 
 4. Compute the risk-neutral probability p＊ and the conditional expectations 𝔼2＊[S̃(3)] and 𝔼1＊[S̃(3)].
 
-5. Investor B estimates that the probability of "up" equals p = 0.6ZZZ. He likes to take a nap from time 1 to time 2 and therefore fails to observe the second coin toss; but he wakes up in time to observe the third coin toss. Determine the sigma-algebra 𝓕1 and the sigma-algebra 𝓕1X3 that model the information available to Investor B at time 1 and time 3, respectively. Then determine 𝔼[ S̃(3) | 𝓕1X3 ], that is, the conditional expectation of S̃(3) conditioned on 𝓕1X3. This should be a random variable measurable in the sigma-algebra 𝓕1X3.
+5. Investor B estimates that the probability of "up" equals p = 0.6000. He likes to take a nap from time 1 to time 2 and therefore fails to observe the second coin toss; but he wakes up in time to observe the third coin toss. Determine the sigma-algebra 𝓕1 and the sigma-algebra 𝓕1X3 that model the information available to Investor B at time 1 and time 3, respectively. Then determine 𝔼[ S̃(3) | 𝓕163 ], that is, the conditional expectation of S̃(3) conditioned on 𝓕1X3. This should be a random variable measurable in the sigma-algebra 𝓕1X3.
 
 Consider a European put option D on the underlying S with expiration date 3 and strike price 12.75.
 
